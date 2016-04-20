@@ -3,7 +3,7 @@
 net: "${outdir}/${fnm}"
 base_lr: ${base_lr}
 lr_policy: "fixed"
-max_iter: 1000000000
+max_iter: 1000000000 # this is 1 billion
 % if momentum > 0:
   momentum: ${momentum}
 % endif
