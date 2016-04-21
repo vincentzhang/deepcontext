@@ -89,7 +89,7 @@ def gen_net(batch_size=100, use_bn=True):
 
 # image preprocessing.  Note that the input image will modified.
 def prep_image(im):
-
+  return im.transpose(2, 0, 1)
   # for some patches, randomly downsample to as little as 100 total pixels
 #  if(random.random() < .33):
 #    origsz=im.shape
@@ -111,18 +111,20 @@ def prep_image(im):
   # AlexNet inputs.
   #im=im / np.sqrt(np.mean(np.square(im))) * 50
   #im = im / np.sqrt(np.mean(np.square(im)))
-  return im.transpose(2, 0, 1)
 
-# Sample a patch.  This function defines a grid over the image of patches
-# of size patch_sz with a gap of gap between the patches.  The upper-left
-# corner of the grid starts at (gridstartx, gridstarty).  We then sample
-# the patch at location (x, y) on this grid, jitter by up to noisehalf in
-# every direction.  im_shape is the dimensions of the image; an error
-# is thrown if (x, y) refers to a patch outside the image frame. 
-#
-# Returns the coordinates of the sampled patch's upper left corner.
 def sample_patch(x, y, gridstartx, gridstarty, patch_sz, gap, noisehalf, 
                  im_shape):
+"""
+Sample a patch.  
+This function defines a grid over the image of patches of size patch_sz 
+with a gap of 'gap' between the patches.  The upper-left corner of the grid 
+starts at (gridstartx, gridstarty).  We then sample the patch at location 
+(x, y) on this grid, jitter by up to noisehalf in every direction.  
+im_shape is the dimensions of the image; 
+an error is thrown if (x, y) refers to a patch outside the image frame. 
+
+Returns the coordinates of the sampled patch's upper left corner.
+"""
   xpix = gridstartx + x * (patch_sz[1] + gap) \
          + random.randint(-noisehalf, noisehalf)
   xpix2 = min(max(xpix, 0), im_shape[1] - patch_sz[1])
@@ -182,11 +184,11 @@ def imgloader(dataq, batch_sz, imgs, tmpdir, seed, tid, patch_sz):
         except:
           print("broken image id " + str(curidx))
           curidx = (curidx + 1) % (len(imgsord))
-          continue;
-        curidx = (curidx + 1) % (len(imgsord));
+          continue
+        curidx = (curidx + 1) % (len(imgsord))
         if(im.shape[0] > patch_sz[0] * 2 + gap + noise and 
            im.shape[1] > patch_sz[1] * 2 + gap + noise):
-          # loop until find an image that's bigger than 2*patch + gap+noise
+          # loop until find an image that's bigger than 2*patch + gap + noise
           break
       gridctr = num_grids;
     # compute where the grid starts, and then comptue its size.
@@ -245,6 +247,9 @@ def imgloader(dataq, batch_sz, imgs, tmpdir, seed, tid, patch_sz):
 # 4   5
 # 6 7 8
 def pos2lbl(pos):
+"""
+  pos: a tuple of (x,y) 
+"""
   (posx, posy)=pos;
   if(posy==-1):
     lbl = posx + 1;
@@ -385,7 +390,6 @@ if __name__ == '__main__':
       for i in range(0,3):
           # Start 3 image loader
         dataq.append(Queue(5))
-        #pdb.set_trace()
         procs.append(Process(target=imgloader, 
                          args=(dataq[-1], batch_sz, imgs, tmpdir,
                                (hash(outdir)+i) % 1000000, #random seed

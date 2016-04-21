@@ -14,15 +14,31 @@ from mako import exceptions
 from mako.lookup import TemplateLookup
 import pdb
 from scipy import misc
-import train
+import train as tp
 
 if __name__ == '__main__':
-    imgs = train.load_imageset()
+    batch_sz = 100
+    patch_sz=(96,96) # size of sampled patches
+    exp_name=ut.mfilename();
+    outdir = deepcontext_config.out_dir + '/' + exp_name + '_out/';
+    tmpdir = deepcontext_config.tmp_dir + '/' + exp_name + '_out/';
+    if not os.path.exists(tmpdir):
+      os.makedirs(tmpdir)
+    if not os.path.exists(outdir):
+      os.mkdir(outdir)
+
+    imgs = tp.load_imageset()
+
     imgsord=np.random.permutation(len(imgs['filename']))
-    #idx = imgsord[0]
     curidx = 0
-    pdb.set_trace()
-    #im = ut.get_image(idx,imgs)
     im=ut.get_resized_image(imgsord[curidx % len(imgs['filename'])],
                             imgs,
                             {"gri_targpixels":random.randint(150000,450000)})
+    pats = []
+    pats=map(tp.prep_image, pats)
+    dataq=[]
+    procs=[]
+    i=0
+    tp.imgloader(dataq, batch_sz, imgs, tmpdir,(hash(outdir)+i) % 1000000, i,
+              patch_sz)
+

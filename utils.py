@@ -81,7 +81,7 @@ def get_resized_image(idx,dataset,conf={}):
       print("found 4-channel png with channel 4 min "+str(np.min(im[:,:,3])));
       im=im[:,:,0:3];
   except:
-    print("image id: " + str(idx));
+    #print("image id: " + str(idx));
     raise
 
   #pdb.set_trace()
