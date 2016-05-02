@@ -1,5 +1,4 @@
 import sys
-#sys.path.insert(0,'caffe_ext/python');
 import utils as ut
 from multiprocessing import Process, Queue, Pool
 import matplotlib.pyplot as plt
@@ -9,12 +8,10 @@ from caffe import layers as L, params as P, to_proto, NetSpec, get_solver, Net
 from caffe.proto import caffe_pb2
 import caffe
 import deepcontext_config
-import pdb
 
 # Basic Configuration
 patch_sz=(96,96) # size of sampled patches
 batch_sz=512     # max patches in a single batch
-#batch_sz=100     # max patches in a single batch
 gap = 48         # gap between patches
 noise = 7        # jitter by at most this many pixels
 patch_eps = 0.04
@@ -68,7 +65,7 @@ def caffenet_stack(data, n, use_bn=True):
     fc_relu(n, n.pool5, '6', 4096, batchnorm=use_bn)
 
 def gen_net(batch_size=512, use_bn=True):
-    n=NetSpec();
+    n=NetSpec()
     n.data = L.DummyData(shape={"dim":[batch_size,3,96,96]})
     n.select1 = L.DummyData(shape={"dim":[2]})
     n.select2 = L.DummyData(shape={"dim":[2]})
@@ -86,36 +83,15 @@ def gen_net(batch_size=512, use_bn=True):
 
     prot=n.to_proto()
     prot.debug_info=True
-    return prot;
+    return prot
 
-# image preprocessing.  Note that the input image will modified.
 def prep_image(im):
-  """
+  """ image preprocessing.  Note that the input image will modified.
+
     Input: height, width, channel 
     Output:channel, height, width, 
   """
   return im.transpose(2, 0, 1)
-  # for some patches, randomly downsample to as little as 100 total pixels
-#  if(random.random() < .33):
-#    origsz=im.shape
-#    randpix=int(math.sqrt(random.random() * (95 * 95 - 10 * 10) + 10 * 10))
-#    im=caffe.io.resize(im.astype(np.uint8), (randpix, randpix))
-#    im=(caffe.io.resize(im, (origsz[0], origsz[1])) * 255).astype(np.float32)
-
-  # randomly drop all but one color channel
-#  chantokeep=random.randint(0, 2);
-#  mean=[123, 117, 104]
-#  for i in range(0, 3):
-#    if i==chantokeep:
-#      im[:,:,i]-=np.mean(im[:,:,i])
-#    else:
-#      im[:,:,i]=np.random.uniform(0, 1, (im.shape[0], im.shape[1])) - .5
-
-  # Normalize the mean and variance so that gradients are a less useful cue;
-  # then scale by 50 so that the variance is roughly the same as the usual
-  # AlexNet inputs.
-  #im=im / np.sqrt(np.mean(np.square(im))) * 50
-  #im = im / np.sqrt(np.mean(np.square(im)))
 
 def sample_patch(x, y, gridstartx, gridstarty, patch_sz, gap, noisehalf, 
                  im_shape):
@@ -360,28 +336,6 @@ def pos2lbl(pos):
     lbl = posx + 6;
   return lbl;
 
-# will set these later, need to make it global for signal handler
-if 'exp_name' not in locals():
-  exp_name='';
-def signal_handler(signal, frame):
-    print("PYCAFFE IS NOT GUARANTEED TO RETURN CONTROL TO PYTHON WHEN " +
-        "INTERRUPTED. That means I can't necessarily clean up temporary files " +
-        "and spawned processes. " +
-        "You were lucky this time. Run deepcontext_quit() to quit. Next time touch " + 
-        exp_name + '_pause to pause safely and ' + exp_name + '_quit to quit.')
-
-def deepcontext_quit():
-  for proc in procs:
-    proc.terminate()
-  time.sleep(2)
-  shutil.rmtree(tmpdir)
-  os.kill(os.getpid(), signal.SIGKILL)
-  if 'prevOutFd' in locals():
-    os.dup2(prevOutFd, sys.stdout.fileno())
-    os.close(prevOutFd)
-    os.dup2(prevErrFd, sys.stderr.fileno())
-    os.close(prevErrFd)
-
 def load_imageset():
   """
     return a dict containing two fields 'dir' (a string) and 'filename' (a list 
@@ -398,17 +352,22 @@ def load_imageset():
   with open(datadir + 'train.txt', 'rb') as f:
     for line in f:
       names.append(line.rstrip()) # strip the newline character
-      #row=line.split()
-      #names.append(row[0])
   imgs['filename']=names
   return imgs
 
-# The main code body.  
+def deepcontext_quit():
+  for proc in procs:
+    proc.terminate()
+  time.sleep(2)
+  shutil.rmtree(tmpdir)
+  os.kill(os.getpid(), signal.SIGKILL)
+
+
 if __name__ == '__main__':
   try:
-    if 'solver' not in locals():
+    if 'procs' not in locals():
       # This returns the current filename without extention
-      exp_name=ut.mfilename();
+      exp_name=ut.mfilename()
       # all generated files will be here.
       outdir = deepcontext_config.out_dir + '/' + exp_name + '_out/';
       if deepcontext_config.tmp_dir:
@@ -419,35 +378,22 @@ if __name__ == '__main__':
         os.mkdir(outdir);
       else:
         try:
-          input=raw_input;
+          input=raw_input
         except:
-          pass;
+          pass
         print('=======================================================================');
         print('Found old data. Load most recent snapshot and append to log file (y/N)?');
         inp=input('======================================================================');
         if not 'y' == inp.lower():
           raise RuntimeError("User stopped execution");
-          
+
       if not os.path.exists(tmpdir):
-        os.makedirs(tmpdir);
-      # by default, we append to the logfile if it's already there.
-      #if os.path.exists(outdir + "out.log"):
-      #  os.remove(outdir + "out.log")
+        os.makedirs(tmpdir)
+      #if not os.path.exists(valdir):
+      #  os.mkdir(valdir)
 
-    # Magic commands to redirect standard output and standard
-    # error to a log file for easy plotting of the loss function.  Note that
-    # running these commands will screw up your terminal; hence why the whole
-    # code is wrapped in a try/finally statement that puts things back the way
-    # they were.
-    prevOutFd = os.dup(sys.stdout.fileno())
-    prevErrFd = os.dup(sys.stderr.fileno()) 
-    tee = subprocess.Popen(["tee", "-a", outdir + "out.log"], stdin=subprocess.PIPE)
-    os.dup2(tee.stdin.fileno(), sys.stdout.fileno())
-    os.dup2(tee.stdin.fileno(), sys.stderr.fileno())
-
-    # if the solver hasn't been set up yet, do so now.  Otherwise assume that 
-    # we're continuing.
-    if 'solver' not in locals():
+      # if the solver hasn't been set up yet, do so now.  
+      # Otherwise assume that we're continuing.
       if os.path.isfile(exp_name + '_pause'):
         print('Removing the pause file')
         os.remove(exp_name + '_pause')
@@ -464,72 +410,19 @@ if __name__ == '__main__':
                    base_lr=1e-5, outdir=outdir, weight_decay=0, momentum=0.9)
 
       print('setting gpu')
-      caffe.set_mode_gpu();
-      print('constructing solver')
-      solver = caffe.get_solver(outdir + 'solver.prototxt');
+      caffe.set_mode_gpu()
+      print('constructing solver from ', outdir+'solver.prototxt')
+      solver = caffe.get_solver(outdir + 'solver.prototxt')
 
-      # Find earlier solvers and restore them
-      fils=glob.glob(outdir + 'model_iter_*.solverstate');
-      if(len(fils)>0):
-        idxs=[];
-        for f in fils:
-          idxs.append(int(re.findall('\d+',os.path.basename(f))[0]));
-        # Load the latest solver state
-        idx=np.argmax(np.array(idxs))
-        solver.restore(outdir + os.path.basename(fils[idx]));
-
-      # we occasionally read out the parameters in this list and save the norm
-      # of the update out to disk, so we can make sure they're updating at
-      # the right speed.
-      track=[]
-      for bl in solver.net.params:
-        if not 'bn' in bl:
-          print "bl: ", bl
-          track.append(bl)
-      nrm=dict()
-      # validation ?
-      intval={};
-      trackold={};
-      for tracknm in track:
-        intval[tracknm]=[]
-        nrm[tracknm]=[]
-      print 'intval', intval
-      print 'nrm', nrm
-      curstep = 6000
-
-      # load the images
-      imgs=load_imageset()
-
-      # start the data prefetching threads.
-      dataq=[]
-      procs=[]
-      i=0
-      for i in range(0,3):
-          # Start 3 image loader
-        dataq.append(Queue(5))
-        procs.append(Process(target=imgloader, 
-                         args=(dataq[-1], batch_sz, imgs, tmpdir,
-                               (hash(outdir)+i) % 1000000, #random seed
-                               i, patch_sz)))
-        procs[-1].start()
-      signal.signal(signal.SIGINT, signal_handler)
-
-      # Total number of training iterations
-      niter = 12000
-
-      # Set up test data before starting training
-      test_interval = 100
-      test_niter = niter/test_interval # test only for 20 times
-      n_test_batch = 100
-      # losses will also be stored in the log
-      # probably better to save it to logs to prevent memory over use
-      #train_loss = np.zeros(test_niter*test_interval)
-      #test_acc = np.zeros(test_niter)
+#      #model_def =  outdir + 'network.prototxt'
+#      #net = caffe.Net(model_def,caffe.TEST)
+      solver_state_file=deepcontext_config.out_dir+'/train_out/model_iter_6000.solverstate'
+      solver.restore(solver_state_file)
 
       ## Read validation data for testing
       valdir = deepcontext_config.out_dir + '/val_data/'
       valfile = deepcontext_config.out_dir + '/val_filelist.txt'
-      val_result_file = outdir + 'val_result'
+
       # Grab a list of file names
       # read images, save to val set
       with open(valfile, 'r') as f:
@@ -541,169 +434,93 @@ if __name__ == '__main__':
         val_label_names.append(val_data_name.split('.npy')[0] + '_label.npy')
         val_perm_names.append(val_data_name.split('.npy')[0] + '_perm.npy')
 
-    ## The main loop over batches.
-    while True:#curstep < niter:
-      # Training 
-      start=time.time()
-      (datafnm, perm, label)=dataq[curstep % len(dataq)].get(timeout=600)
-      print("queue size: " + str(dataq[curstep % len(dataq)].qsize()))
-
-      if(tmpdir is None):
-        d=datafnm
-      else:
-        # load the patches data from disk
-        d=np.load(datafnm,mmap_mode='r')
-        os.remove(datafnm)
+      idx_batch = 0
+      val_data = np.load(val_data_names[idx_batch%len(val_data_names)],mmap_mode='r')
+      val_perm = np.load(val_perm_names[idx_batch%len(val_perm_names)],mmap_mode='r')
+      val_label = np.load(val_label_names[idx_batch%len(val_label_names)],mmap_mode='r')
 
       # input the patch data
-      solver.net.blobs['data'].reshape(*d.shape)
-      solver.net.blobs['data'].data[:]=d[:]
-      #print 'data shape: ', solver.net.blobs['data'].data.shape
+      solver.net.blobs['data'].reshape(*val_data.shape)
+      solver.net.blobs['data'].data[:]=val_data[:]
 
       # input the patch pairings
-      solver.net.blobs['select1'].reshape(*(perm.shape[0],))
-      solver.net.blobs['select1'].data[:]=perm[:,0]
-      #print 'select1 shape: ', solver.net.blobs['select1'].data.shape
-      solver.net.blobs['select2'].reshape(*(perm.shape[0],))
-      solver.net.blobs['select2'].data[:]=perm[:,1]
-      #print 'select2 shape: ', solver.net.blobs['select2'].data.shape
+      solver.net.blobs['select1'].reshape(*(val_perm.shape[0],))
+      solver.net.blobs['select1'].data[:]=val_perm[:,0]
+      
+      solver.net.blobs['select2'].reshape(*(val_perm.shape[0],))
+      solver.net.blobs['select2'].data[:]=val_perm[:,1]
 
       # input the labels
-      solver.net.blobs['label'].reshape(*label.shape)
-      solver.net.blobs['label'].data[:]=label
+      solver.net.blobs['label'].reshape(*val_label.shape)
+      solver.net.blobs['label'].data[:]=val_label
 
-      print("data input time: " + str(time.time()-start));
+      solver.net.forward()
 
-      # take a step
-      solver.step(1)
-      print("norm_loss: " + str(solver.net.blobs['loss'].data /
-            (label.shape[0])));
-      print("solver step time: " + str(time.time() - start));
-          # store the train loss
-      #train_loss[curstep] = solver.net.blobs['loss'].data/ label.shape[0]
+      net = solver.net
+      print 'filters'
+      for layer_name, param in net.params.iteritems():
+        print layer_name + '\t' + str(param[0].data.shape), str(param[1].data.shape)
+      print 'activations'
+      for layer_name, blob in net.blobs.iteritems():
+        print layer_name + '\t' + str(blob.data.shape)
 
-      ### Testing
-      ### Test at every interval
-      if curstep % test_interval == 0:
-        # run a full test every so often
-        print 'Iteration', curstep, '. Overall iter: ', solver.iter , 'testing...'
-        correct = 0
-        len_label = 0 # this is the total length of labels over entire batch
-        total_loss = 0
-        start=time.time()
-        # test over the first 100 batches in the list
-        for idx_batch in range(n_test_batch):
-          sys.stdout.write('.')
-          # load the patches data from disk
-          val_data = np.load(val_data_names[idx_batch%len(val_data_names)],mmap_mode='r')
-          val_perm = np.load(val_perm_names[idx_batch%len(val_perm_names)],mmap_mode='r')
-          val_label = np.load(val_label_names[idx_batch%len(val_label_names)],mmap_mode='r')
-          #plt.imshow(d[0,:,:,:].transpose(1,2,0)/255,cmap=plt.cm.gray)
 
-          # input the patch data
-          solver.net.blobs['data'].reshape(*val_data.shape)
-          solver.net.blobs['data'].data[:]=val_data[:]
-          #print 'data shape: ', solver.net.blobs['data'].data.shape
-
-          # input the patch pairings
-          solver.net.blobs['select1'].reshape(*(val_perm.shape[0],))
-          solver.net.blobs['select1'].data[:]=val_perm[:,0]
-          #print 'select1 shape: ', solver.net.blobs['select1'].data.shape
-          solver.net.blobs['select2'].reshape(*(val_perm.shape[0],))
-          solver.net.blobs['select2'].data[:]=val_perm[:,1]
-          #print 'select2 shape: ', solver.net.blobs['select2'].data.shape
-
-          # input the labels
-          solver.net.blobs['label'].reshape(*val_label.shape)
-          solver.net.blobs['label'].data[:]=val_label
-
-          solver.net.forward()
-          correct += sum(solver.net.blobs['fc9'].data.argmax(1)
-                        == solver.net.blobs['label'].data)
-          len_label += val_label.shape[0]
-          total_loss +=solver.net.blobs['loss'].data/(val_label.shape[0])
- 
-        #test_acc[curstep // test_interval] = correct / float(len_label)
-        print("Validation batch time: " + str(time.time() - start))
-        print "Validation accuracy: ", correct / float(len_label)
-        #  test_acc[curstep // test_interval]
-        print "Validation batch norm_loss: " , total_loss/n_test_batch
-    
-        # plot after all test iterations finished
-        #print "Plotting the test accuracy and train loss"
-        #_, ax1 = plt.subplots()
-        #ax2 = ax1.twinx()
-        #ax1.plot(np.arange(test_niter*test_interval), train_loss)
-        #ax2.plot(test_interval * np.arange(len(test_acc)), test_acc, 'r')
-        #ax1.set_xlabel('iteration')
-        #ax1.set_ylabel('train loss')
-        #ax2.set_ylabel('test accuracy')
-        #ax2.set_title('Custom Test Accuracy: {:.2f}'.format(test_acc[-1]))
-        #plt.savefig(outdir+'test_inter_acc_'+str(test_interval)+'_'+str(test_niter)+'.png', bbox_inches='tight')
-
-      dobreak=False
-      broken=[]
-
-      msg = (' Please examine the situation and re-execute ' + exp_name + 
-             '.py to continue.')
-      # Peek into the network every 100 iterations
-      if curstep % 100 == 0:
-        start = time.time()
-        print("getting param statistics...")
-        for tracknm in track:
-          try:
-            intval[tracknm].append(np.sqrt(np.sum(np.square(
-                solver.net.params[tracknm][0].data - trackold[tracknm]))));
-            if (intval[tracknm][-1] > 10 * intval[tracknm][-2] 
-                and curstep > 100) \
-                or np.isnan(intval[tracknm][-1]):
-              print(tracknm + " changed a suspiciously large amount." + msg)
-              dobreak = True
-              broken.append(tracknm)
-          except:
-            print("init " + tracknm + " statistics")
-          trackold[tracknm]=np.copy(solver.net.params[tracknm][0].data)
-          nrmval=np.sqrt(np.sum(np.square(solver.net.params[tracknm][0].data)))
-          nrm[tracknm].append(nrmval)
-        np.save(outdir + 'intval',intval)
-        np.save(outdir + 'nrm',nrm)
-        print("param statistics time: " + str(time.time()-start));
-
-        # Check fc8 weights
-        val = np.sum(solver.net.params["fc8"][0].data)
-        if np.isnan(val) or val > 1e10:
-          print("fc8 activations look broken to me." + msg)
-          dobreak = True
-        # Check the gradients of pool1 activations.
-        # broken if the gradients are too big
-        val2 = np.max(np.abs(solver.net.blobs["pool1"].diff));
-        if np.isnan(val2) or val2 > 1e8:
-          print("pool1 diffs look broken to me." + msg)
-          dobreak = True
-
-      curstep += 1
-      if dobreak:
-        break
-      if os.path.isfile(exp_name + '_pause'):
-        break
-      if os.path.isfile(exp_name + '_quit'):
-        # Need to kill the subprocesses and delete the temporary files.
-        deepcontext_quit()
-    # Store the testing results
-    #val_result = {'train_loss': train_loss, 'test_acc':test_acc}
-    #np.save(val_result_file, val_result)
-
+#      print net.params['fc8'][0].data
+#
+      # loading images
+#      imgs=load_imageset()
+#
+#      # start the data prefetching threads to get test data
+#      dataq=[]
+#      procs=[]
+#      i=0
+#      for i in range(0,3):
+#        # Start 3 image loader, store images to outdir
+#        dataq.append(Queue(5))
+#        procs.append(Process(target=imgloader, 
+#                         args=(dataq[-1], batch_sz, imgs, valdir,
+#                               (hash(outdir)+i) % 1000000, #random seed
+#                               i, patch_sz)))
+#        procs[-1].start()
+#
+#    # The main loop over batches.
+#    niter = 1000
+#    #test_interval = niter / 10
+#    # losses will also be stored in the log
+#    #train_loss = np.zeros(niter)
+#    #test_acc = np.zeros(int(np.ceil(niter / test_interval)))
+#    dobreak = False
+#
+#    for curstep in range(niter):
+#      start=time.time()
+#      (datafnm, perm, label)=dataq[curstep % len(dataq)].get(timeout=600)
+#      print("queue size: " + str(dataq[curstep % len(dataq)].qsize()))
+#
+#      # load the patches data from disk
+#      #d=np.load(datafnm,mmap_mode='r')
+#      #os.remove(datafnm)
+#      print('saving labels for ',datafnm)
+#      np.save(datafnm.split('.')[0]+'_perm.npy', perm)
+#      np.save(datafnm.split('.')[0]+'_label.npy', label)
+#
+#      if dobreak:
+#        break;
+#      if os.path.isfile(exp_name + '_pause'):
+#        break;
+#      if os.path.isfile(exp_name + '_quit'):
+#        # Need to kill the subprocesses and delete the temporary files.
+#        deepcontext_quit();
   except KeyboardInterrupt:
-    if 'procs' in locals():
-      handler(None,None)
-      deepcontext_quit()
-    #raise
+    #if 'procs' in locals():
+    #  handler(None,None)
+    raise
   finally:
     if 'procs' in locals():
       for proc in procs:
         proc.terminate()
-        time.sleep(2)
-      shutil.rmtree(tmpdir)
+      time.sleep(2)
+    shutil.rmtree(tmpdir)
+
     if 'prevOutFd' in locals():
       os.dup2(prevOutFd, sys.stdout.fileno())
       os.close(prevOutFd)

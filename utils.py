@@ -51,12 +51,17 @@ def mkorenderstr(strtpl,outfile,*args,**kwargs):
   mkorendertpl(tpl,outfile,*args,**kwargs);
 
 def get_image(idx,dataset):
-  im=misc.imread(dataset['dir'] + dataset['filename'][idx]);
+  """
+    Returns an image, if image is grayscale, replicate to 3 channels
+    The range of the data is [0,255]
+    Output Dimension: height, width, channel
+  """
+  im=misc.imread(dataset['dir'] + dataset['filename'][idx])
   if (len(im.shape)==2):
     # if grayscale, stack three channels
     # img shape: height, width, channel, example: 1111x1111x3
-    im=np.concatenate((im[:,:,None],im[:,:,None],im[:,:,None]),axis=2);
-  return im;
+    im=np.concatenate((im[:,:,None],im[:,:,None],im[:,:,None]),axis=2)
+  return im
 
 def get_resized_image(idx,dataset,conf={}):
   """
@@ -64,7 +69,6 @@ def get_resized_image(idx,dataset,conf={}):
         dataset: imgs{'dir','filename'}
         conf: dictionary 
   """
-  #pdb.set_trace()
   targpixels=None;
   if 'targpixels' in dataset:
     targpixels=dataset['targpixels']
@@ -73,18 +77,17 @@ def get_resized_image(idx,dataset,conf={}):
     targpixels=conf['gri_targpixels'];
   maxdim=conf.get('gri_maxdim',None);
   try:
-    im=get_image(idx,dataset);
-    if(len(im.shape)==2):
-      print("found grayscale image");
-      im=np.array([im,im,im]).transpose(1,2,0);
-    elif(im.shape[2]==4):
-      print("found 4-channel png with channel 4 min "+str(np.min(im[:,:,3])));
-      im=im[:,:,0:3];
+    im=get_image(idx,dataset)
   except:
-    #print("image id: " + str(idx));
+    print "Exception when reading image: ", idx, " ,pixel: ", targpixels
     raise
+  if(len(im.shape)==2):
+    print("found grayscale image");
+    im=np.array([im,im,im]).transpose(1,2,0);
+  elif(im.shape[2]==4):
+    print("found 4-channel png with channel 4 min "+str(np.min(im[:,:,3])));
+    im=im[:,:,0:3];
 
-  #pdb.set_trace()
   # Rescaling the intensity to [0,1], 1: white
   im=im.astype(np.float32)/255;
   if targpixels is not None:
@@ -93,12 +96,17 @@ def get_resized_image(idx,dataset,conf={}):
     # TODO: this has issues with the image boundary, as it samples zeros 
     # outside the image bounds.
     # Assume it's square image
-    im=caffe.io.resize_image(im,(int(im.shape[0]*np.sqrt(targpixels/npixels)),int(im.shape[1]*np.sqrt(targpixels/npixels))))
+    try:
+      # this function uses spline interpolation == 1 by default
+      im=caffe.io.resize_image(im,(int(im.shape[0]*np.sqrt(targpixels/npixels)),int(im.shape[1]*np.sqrt(targpixels/npixels))))
+    except:
+      print "Exception when calling io.resize_image"
+      raise
   elif maxdim is not None:
     immax=max(im.shape[0:2]);
     ratio=float(maxdim)/float(immax);
     im=caffe.io.resize_image(im,(int(im.shape[0]*ratio),int(im.shape[1]*ratio)))
-  return im;
+  return im
 
 def dispdata(net,idx,layer='data'):
   dat=net.blobs[layer].data[idx,:,:,:].transpose((1,2,0));

@@ -1,0 +1,22 @@
+#
+<%page args="outdir, base_lr, momentum=0.0, fnm='network_conv_sketch_no_bn.prototxt', weight_decay=0.0, solver_type='SGD'"/>
+net: "${outdir}/${fnm}"
+base_lr: ${base_lr}
+lr_policy: "fixed"
+# test_iter specifies how many forward passes the test should carry out.
+# In the case of sketch,  we have test batch size 50 and 135 test iterations,
+# covering the full 6,750 testing images.
+test_iter: 135
+#test_iter:  10
+test_interval: 100
+max_iter: 100
+% if momentum > 0:
+  momentum: ${momentum}
+% endif
+weight_decay: ${weight_decay}
+snapshot: 2000
+snapshot_prefix: "${outdir}/model_finetune"
+solver_mode: GPU
+type: "${solver_type}"
+delta: 5e-7
+display: 10
