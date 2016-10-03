@@ -3,11 +3,16 @@
 net: "${outdir}/${fnm}"
 base_lr: ${base_lr}
 lr_policy: "fixed"
+# Anneal the lr by 0.1 for every 20 epoch
+#lr_policy: "step"
+#gamma: 0.1
+#stepsize: 2700
 # test_iter specifies how many forward passes the test should carry out.
 # In the case of sketch,  we have test batch size 50 and 135 test iterations,
 # covering the full 6,750 testing images.
+# 27 * 250 = 6,750
 test_iter: 135
-#test_iter:  10
+#135
 test_interval: 100
 max_iter: 100
 % if momentum > 0:
@@ -19,4 +24,4 @@ snapshot_prefix: "${outdir}/model_finetune"
 solver_mode: GPU
 type: "${solver_type}"
 delta: 5e-7
-display: 10
+display: 5

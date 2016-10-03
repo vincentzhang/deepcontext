@@ -371,16 +371,16 @@ def signal_handler(signal, frame):
         exp_name + '_pause to pause safely and ' + exp_name + '_quit to quit.')
 
 def deepcontext_quit():
-  for proc in procs:
-    proc.terminate()
-  time.sleep(2)
-  shutil.rmtree(tmpdir)
-  os.kill(os.getpid(), signal.SIGKILL)
   if 'prevOutFd' in locals():
     os.dup2(prevOutFd, sys.stdout.fileno())
     os.close(prevOutFd)
     os.dup2(prevErrFd, sys.stderr.fileno())
     os.close(prevErrFd)
+  for proc in procs:
+    proc.terminate()
+  time.sleep(2)
+  shutil.rmtree(tmpdir)
+  os.kill(os.getpid(), signal.SIGKILL)
 
 def load_imageset():
   """
@@ -495,7 +495,7 @@ if __name__ == '__main__':
         nrm[tracknm]=[]
       print 'intval', intval
       print 'nrm', nrm
-      curstep = 6000
+      curstep = 16000
 
       # load the images
       imgs=load_imageset()

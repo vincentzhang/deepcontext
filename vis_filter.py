@@ -1,7 +1,7 @@
 def vis_square(data):
   data = (data - data.min()) / (data.max() - data.min())
   n = int(np.ceil(np.sqrt(data.shape[0])))
-  #print 'number of filters is ', n
+  print 'number of filters is ', n
   padding = (((0, n ** 2 - data.shape[0]),
              (0, 1), (0, 1))
              + ((0, 0),) * (data.ndim - 3))
@@ -17,6 +17,7 @@ def vis_square(data):
   plt.imshow(data,cmap=plt.cm.gray)
   plt.axis('off')
 #
-vis_square(solver.net.params['conv1'][0].data.transpose(0,2,3,1))
-plt.show()
+if __name__ == '__main__':
+  vis_square(solver.net.params['conv1'][0].data.transpose(0,2,3,1))
+  plt.show()
 

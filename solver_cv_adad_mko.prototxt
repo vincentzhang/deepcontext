@@ -1,0 +1,21 @@
+#
+<%page args="outdir, base_lr, delta=1e-8, momentum=0.0, fnm='network_conv_sketch_no_bn_no_freeze.prototxt', weight_decay=0.0, solver_type='SGD'"/>
+net: "${outdir}/${fnm}"
+base_lr: ${base_lr}
+lr_policy: "fixed"
+# test_iter specifies how many forward passes the test should carry out.
+# In the case of sketch,  we have val batch size 50 and 55 test iterations,
+# covering the full 2,750 testing images.
+# 11 * 250 = 2,750
+test_iter: 55
+test_interval: 105
+% if momentum > 0:
+  momentum: ${momentum}
+% endif
+weight_decay: ${weight_decay}
+snapshot: 2000
+snapshot_prefix: "${outdir}/model_cv"
+solver_mode: GPU
+type: "${solver_type}"
+display: 5
+delta: ${delta}
